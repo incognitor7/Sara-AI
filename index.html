@@ -14,16 +14,20 @@
 <body>
 <aside id="side">
   <div class="sh"><span><b class="logo">S</b>Sara AI</span><button id="x" class="ib"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
-  <button id="folderBtn" class="pill"></button>
+  <div class="pill ok"><svg class="i" viewBox="0 0 24 24"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM8 12l3 3 5-6"/></svg> Guardado en este navegador</div>
   <button id="newBtn" class="btn pri"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Nuevo chat</button>
   <div class="tabs"><button data-m="normal" class="on">Chats</button><button data-m="course">Cursos</button></div>
+  <input id="q" type="search" class="fld" placeholder="Buscar en tus chats…" aria-label="Buscar chats" autocomplete="off">
   <div id="list"></div>
   <div class="foot">
     <details><summary>Asistentes</summary><div id="asts"></div><button id="astNew" class="btn"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Crear asistente</button></details>
     <details><summary>Documentos</summary><div id="docs"></div></details>
     <details id="cfg"><summary>Ajustes</summary>
-      <div><label>API Key de OpenRouter</label><input id="key" type="password" class="fld" placeholder="sk-or-v1-..."></div>
-      <button id="chg" class="btn"><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg> Cambiar carpeta</button>
+      <div><label for="key">API Key de OpenRouter</label>
+        <div class="keyrow"><input id="key" type="password" class="fld" placeholder="sk-or-v1-..." autocomplete="off" spellcheck="false"><button id="keyEye" class="ib" type="button" title="Mostrar u ocultar la clave" aria-label="Mostrar u ocultar la clave"><svg class="i" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg></button></div>
+        <p id="keyState" class="mut"></p></div>
+      <button id="keySave" class="btn pri" type="button">Guardar clave</button>
+      <button id="keyReset" class="btn" type="button">Borrar clave</button>
     </details>
   </div>
 </aside>
@@ -32,6 +36,7 @@
   <header>
     <button id="menu" class="ib"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
     <button id="title">Nueva conversación</button>
+    <button id="exp" class="ib" title="Exportar chat (.md)" aria-label="Exportar chat"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg></button>
     <select id="model">
       <option value="google/gemini-2.0-flash-lite-001:free">Gemini 2.0 Flash Lite</option>
       <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B</option>
@@ -40,10 +45,9 @@
       <option value="openrouter/auto">Auto (gratis)</option>
     </select>
   </header>
-  <div id="banner" hidden><span>Tu carpeta está guardada. Toca para reconectarla.</span><button class="chip">Reconectar</button></div>
   <div id="empty">
     <div class="logo">S</div>
-    <h2>¿Qué deseas saber hoy, Javier?</h2>
+    <h2>¿Qué deseas saber hoy?</h2>
     <p>Elige un tema o escribe tu pregunta abajo.</p>
     <div class="ex">
       <button data-q="Crea un documento que enseñe las variables, bucles, condicionales y funciones">Crear un documento: guía de programación</button>
@@ -72,7 +76,16 @@
 </dialog>
 <dialog id="dDoc">
   <h3 id="dTitle"></h3><div id="dBody" class="a"><div class="b"></div></div>
-  <div class="row"><button class="btn" data-close>Cerrar</button></div>
+  <div class="row"><button id="dDel" class="btn">Eliminar</button><button id="dDl" class="btn">Descargar .md</button><button class="btn" data-close>Cerrar</button></div>
+</dialog>
+<dialog id="dKey">
+  <div class="logo">S</div>
+  <h3>Te damos la bienvenida a Sara AI</h3>
+  <p class="mut">Pega tu API Key de OpenRouter para empezar. Se guarda solo en este navegador y solo se envía a OpenRouter.</p>
+  <div class="keyrow"><input id="key0" type="password" class="fld" placeholder="sk-or-v1-..." autocomplete="off" spellcheck="false" aria-label="API Key de OpenRouter"><button id="key0Eye" class="ib" type="button" title="Mostrar u ocultar la clave" aria-label="Mostrar u ocultar la clave"><svg class="i" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg></button></div>
+  <p id="key0Err" class="err" hidden></p>
+  <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">Crea una clave gratis en openrouter.ai/keys</a>
+  <div class="row"><button id="key0Save" class="btn pri" type="button">Guardar y empezar</button></div>
 </dialog>
 <div id="toast"></div>
 <script src="tools.js"></script>

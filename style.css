@@ -11,7 +11,7 @@ button{cursor:pointer;background:none;border:0}
 .sh{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:17px}
 #x,#scrim{display:none}
 .pill{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:10px;background:var(--s2);font-size:13px;color:var(--mu);text-align:left}
-.pill.ok{color:var(--ok)}.pill.warn{color:var(--wn);outline:1px solid var(--wn)}
+.pill.ok{color:var(--ok)}
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;border-radius:10px;background:var(--s2);border:1px solid var(--ln);font-size:14px}
 .btn:hover{background:var(--ln)}.btn.pri{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
 .tabs{display:flex;background:var(--bg);border-radius:10px;padding:3px}
@@ -38,7 +38,6 @@ header{display:flex;align-items:center;gap:8px;padding:8px 12px;padding-top:max(
 .ib{width:38px;height:38px;border-radius:10px;color:var(--mu)}.ib:hover{background:var(--s2);color:var(--tx)}
 #title{flex:1;min-width:0;text-align:left;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 select{background:var(--s2);border:1px solid var(--ln);border-radius:8px;padding:6px 8px;font-size:13px;max-width:150px;outline:0}
-#banner{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 14px;background:rgba(251,191,36,.12);color:var(--wn);font-size:13px;cursor:pointer}
 #msgs{flex:1;overflow-y:auto;padding:20px max(16px,calc((100% - 760px)/2)) 8px;display:flex;flex-direction:column;gap:24px}
 .m{display:flex;flex-direction:column;min-width:0}
 .m.u{align-items:flex-end}
@@ -148,3 +147,44 @@ header{background:rgba(14,15,19,.85);backdrop-filter:blur(8px)}
 .vol{width:64px;flex-shrink:0;accent-color:var(--ac)}
 @media(max-width:520px){.pc-v{grid-template-columns:1fr}.tl-bar .tbtn{flex:1 1 auto}.tl-bar .tl-rate{flex:1 1 100%}.pc-s{min-width:44px}}
 @media(prefers-reduced-motion:reduce){.fc-in,.tl-prog i{transition:none}}
+
+/* ---------- Tablet horizontal: el cuadro de mensaje siempre visible ---------- */
+main{min-height:0}
+#empty{min-height:0;overflow-y:auto;justify-content:flex-start}
+#empty>:first-child{margin-top:auto}
+#empty>:last-child{margin-bottom:auto}
+#msgs{min-height:0}
+.dock{flex-shrink:0}
+@media(orientation:landscape) and (max-height:820px){
+#empty{gap:6px;padding:12px 20px}
+#empty .logo{width:40px;height:40px;font-size:19px;margin-bottom:2px}
+#empty h2{font-size:19px}
+.ex{grid-template-columns:1fr 1fr;max-width:640px;gap:6px;margin-top:4px}
+.ex button{padding:9px 12px;font-size:13px}
+.ex button:last-child:nth-child(odd){grid-column:1/-1}
+.dock{padding-top:4px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+}
+/* ---------- API Key ---------- */
+.keyrow{display:flex;gap:6px;align-items:center}
+.keyrow .ib{flex-shrink:0;border:1px solid var(--ln)}
+#keyState{padding:6px 0 0}
+
+/* ---------- Bienvenida, búsqueda y pulido ---------- */
+#dKey{text-align:center;width:min(92vw,440px);padding:26px 22px}
+#dKey .logo{width:56px;height:56px;border-radius:17px;font-size:26px;margin:0 auto 12px}
+#dKey h3{font-size:20px;margin-bottom:4px}
+#dKey .mut{padding:0 0 14px}
+#dKey .fld{font-size:16px}
+#dKey a{display:inline-block;margin-top:12px;font-size:13px;color:var(--ac)}
+#dKey .row .btn{width:100%;padding:11px}
+.err{margin-top:8px;font-size:13px;color:#f87171;text-align:left}
+@keyframes pop{from{opacity:0;transform:scale(.96)}}
+dialog[open]{animation:pop .2s}
+#q{flex-shrink:0;margin:0}
+.it.on{box-shadow:inset 3px 0 var(--ac)}
+.m.u .b{background:rgba(124,131,255,.14);border:1px solid rgba(124,131,255,.28)}
+#f{box-shadow:0 6px 28px rgba(0,0,0,.35)}
+.acts{opacity:.55;transition:opacity .15s}.m:hover .acts,.acts:focus-within{opacity:1}
+@media(hover:none){.acts{opacity:1}}
+#dDoc .row{flex-wrap:wrap}
+.ib:focus-visible,.btn:focus-visible,.fld:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
