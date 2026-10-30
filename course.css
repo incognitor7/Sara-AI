@@ -61,3 +61,45 @@
 .cv-ld .tag{margin:6px 0 0;text-align:center}.cv-ld .tag small{text-transform:none;letter-spacing:0;color:var(--mu);font-weight:400}
 #pong{width:100%;max-width:480px;aspect-ratio:16/9;align-self:center;border-radius:14px;border:2px solid var(--ln);touch-action:none;cursor:ns-resize;background:var(--s1)}
 @media(prefers-reduced-motion:reduce){.ld-bar i::after{animation:none}}
+
+/* ===================== Rediseño 2.0: cursos, panel y racha ===================== */
+#cv{background:radial-gradient(800px 380px at 50% -10%,rgba(124,131,255,.18),transparent 60%),var(--bg)}
+.cv-p{height:12px}
+.cv-st{background:var(--s1);border:1px solid var(--ln);padding:5px 11px;border-radius:999px;font-size:13px}
+.cv-st[data-a]{cursor:pointer}.cv-st[data-a]:hover{border-color:var(--wn)}
+.cv-hero h2{font-size:24px;letter-spacing:-.02em}
+.cv-mod{background:linear-gradient(90deg,rgba(124,131,255,.16),var(--s1));border-radius:14px}
+.node span{box-shadow:0 8px 18px rgba(0,0,0,.35)}
+#cv .opt{border-radius:14px}
+.cv-f{backdrop-filter:blur(10px);background:rgba(18,20,28,.92)}
+.cv-f .btn.pri:not(:disabled){animation:rdy .35s}
+@keyframes rdy{from{transform:scale(.96);opacity:.6}}
+.cv-f .btn:disabled{box-shadow:none}
+/* Panel Cursos / Racha / Rendimiento */
+.cv-b.dash{max-width:760px}.dash>*+*{margin-top:14px}
+.ds-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.ds-stats>div,.card,.ds-m>div{background:var(--s1);border:1px solid var(--ln);border-radius:18px;padding:14px}
+.ds-stats b{display:block;font-size:24px;line-height:1.2}.ds-stats small,.ds-m small{color:var(--mu);font-size:12px}
+.ds-stats .fl{background:linear-gradient(135deg,rgba(255,159,67,.2),var(--s1));border-color:rgba(255,159,67,.45)}
+.ds-h{font-size:13px;font-weight:600;color:var(--mu);margin-top:22px!important}
+.cc{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;background:var(--s1);border:1px solid var(--ln);cursor:pointer;transition:border-color .15s,transform .15s}
+.cc:hover{border-color:var(--ac);transform:translateY(-1px)}
+.cc-i{font-size:24px;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:var(--s2);flex-shrink:0}
+.cc-t{flex:1;min-width:0}.cc-t b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cc-t small{color:var(--mu);font-size:12px}
+.cc-p{height:6px;border-radius:3px;background:var(--s2);margin-top:6px;overflow:hidden}.cc-p i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--ac),#a5a9ff)}
+.cal-h{display:flex;align-items:center;justify-content:space-between;font-weight:600;text-transform:capitalize;margin-bottom:10px}
+.cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.cal-g span{font-size:11px;color:var(--mu);padding-bottom:2px}
+.cal-g b{aspect-ratio:1;display:grid;place-items:center;border-radius:50%;font-size:13px;font-weight:500;color:var(--mu)}
+.cal-g b.on{background:linear-gradient(135deg,#ffb347,#ff6b3d);color:#fff;font-weight:700;box-shadow:0 4px 12px rgba(255,107,61,.3)}
+.cal-g b.sh{background:rgba(96,165,250,.16);border:1px solid #60a5fa}
+.cal-g b.td{outline:2px solid var(--ac);outline-offset:2px}
+.shop{display:flex;align-items:center;gap:12px}.shop .sp{font-size:30px}.shop .ci{flex:1;min-width:0}.shop b{display:block}.shop small{display:block;color:var(--mu);font-size:12.5px;line-height:1.4}
+.shop .btn{width:auto;padding:10px 16px;flex-shrink:0}.shop .btn:disabled{opacity:.45;box-shadow:none;cursor:not-allowed}
+.ds-m{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.ds-m>div{padding:12px}
+.ds-m span{font-size:18px}.ds-m b{display:block;font-size:22px;margin:2px 0}
+.wk{display:flex;align-items:flex-end;gap:8px;height:96px;margin-top:10px}
+.wk>div{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px}
+.wk i{display:block;width:100%;min-height:4px;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,var(--ac),#565cd1)}
+.wk small{font-size:11px;color:var(--mu);text-transform:uppercase}
+@media(max-width:520px){.ds-m{grid-template-columns:repeat(2,1fr)}.ds-stats b{font-size:20px}.shop{flex-wrap:wrap}}

@@ -3,10 +3,41 @@
    Usa globals de script.js: $, esc, md, toast, kv, apiKey, needKey. Reutiliza Tools (flashcards/test) para repasos. */
 (() => {
 'use strict';
-const st = {xp: 0, streak: 0, last: ''};
+const st = {xp: 0, streak: 0, best: 0, last: '', days: [], prot: [], hist: {}, acc: {ok: 0, tot: 0}, shields: 0, mute: false};
+const PRICE = 50, MAXS = 2;
 let C = {}, cc = null, ov, Q = [], n = 0, lesson = null, ok = 0, tot = 0, retry = null, tried = false;
 const save = () => kv.set('courses', {C, st});
 const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w ]/g, '').trim();
+// ---------- Fechas, racha y protectores ----------
+const pad = n => String(n).padStart(2, '0');
+const dkey = (o = 0) => { const d = new Date(); d.setDate(d.getDate() + o); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+function mig() { // compatibilidad con datos guardados antes de este cambio
+  if (st.last && !/^\d{4}-/.test(st.last)) { const d = new Date(st.last); st.last = isNaN(d) ? '' : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+  st.days = st.days || []; st.prot = st.prot || []; st.hist = st.hist || {}; st.acc = st.acc || {ok: 0, tot: 0}; st.shields = st.shields || 0;
+  st.best = Math.max(st.best || 0, st.streak || 0); if (st.last && !st.days.includes(st.last)) st.days.push(st.last);
+}
+function sync() { // si faltaron días: gasta protectores o rompe la racha
+  const t = dkey(), y = dkey(-1); if (!st.streak || !st.last || st.last >= y) return;
+  const miss = Math.round((new Date(t + 'T00:00') - new Date(st.last + 'T00:00')) / 864e5) - 1;
+  if (st.shields >= miss) { st.shields -= miss; for (let i = miss; i > 0; i--) st.prot.push(dkey(-i)); st.last = y; toast('🛡️ Un protector salvó tu racha'); }
+  else st.streak = 0;
+  save();
+}
+function activate() {
+  const t = dkey(); if (st.last !== t) { st.streak = st.last === dkey(-1) ? st.streak + 1 : 1; st.last = t; }
+  if (!st.days.includes(t)) st.days.push(t); st.best = Math.max(st.best, st.streak); st.hist[t] = (st.hist[t] || 0) + 1;
+}
+// ---------- Sonidos de recompensa (sintetizados, sin archivos) ----------
+let AC;
+const SFX = {tap: [[540, 0, .07, 'triangle']], ok: [[660, 0, .12], [880, .09, .12], [1320, .18, .32]], bad: [[240, 0, .16, 'triangle'], [180, .13, .26, 'triangle']],
+  done: [[523, 0, .14], [659, .12, .14], [784, .24, .14], [1047, .36, .55]], buy: [[1568, 0, .09, 'triangle'], [2093, .08, .4, 'triangle']]};
+function sfx(k) {
+  if (st.mute) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume();
+    (SFX[k] || []).forEach(([f, t, d, ty]) => { const o = AC.createOscillator(), g = AC.createGain(), s = AC.currentTime + t; o.type = ty || 'sine'; o.frequency.value = f; o.connect(g); g.connect(AC.destination); g.gain.setValueAtTime(.0001, s); g.gain.exponentialRampToValueAtTime(.18, s + .015); g.gain.exponentialRampToValueAtTime(.0001, s + d); o.start(s); o.stop(s + d + .05); });
+  } catch { }
+}
 const prof = c => `Tema: ${c.p.topic}. Nivel: ${c.p.level}. Tiempo disponible: ${c.p.time}. Objetivo: ${c.p.goal}.`;
 
 // ---------- API (una petición = un JSON corto) ----------
@@ -71,7 +102,7 @@ async function review(kind) {
 }
 
 // ---------- Vistas ----------
-const bar = (a, pct = 0) => `<div class="cv-h"><button class="ib" data-a="${a}" aria-label="Salir">✕</button><div class="cv-p"><i style="width:${pct}%"></i></div><span class="cv-st">🔥 ${st.streak} · ⭐ ${st.xp}</span></div>`;
+const bar = (a, pct = 0) => `<div class="cv-h"><button class="ib" data-a="${a}" aria-label="Salir">✕</button><div class="cv-p"><i style="width:${pct}%"></i></div><span class="cv-st"${a === 'dash' ? ' data-a="dash" title="Ver racha y rendimiento"' : ''}>🔥 ${st.streak} · ⭐ ${st.xp}</span></div>`;
 let lt = 0;
 function busy(m, steps = [m], i = 0) {
   clearInterval(lt);
@@ -122,7 +153,7 @@ const QS = [
 let ob = {i: 0, a: {}};
 function onboard() {
   show(); const s = QS[ob.i];
-  ov.innerHTML = bar('close', ob.i / QS.length * 100) + `<div class="cv-b cv-q"><h2>${s.q}</h2>` +
+  ov.innerHTML = bar('dash', ob.i / QS.length * 100) + `<div class="cv-b cv-q"><h2>${s.q}</h2>` +
     (s.o ? `<div class="opts">${s.o.map((o, k) => `<button class="opt" data-a="ans" data-v="${esc(o)}">${esc(o)}</button>`).join('')}</div>`
       : `<input id="obIn" class="fld cv-in" placeholder="${esc(s.ph)}" autocomplete="off"><div class="cv-f2"><button class="btn pri" data-a="ans">Continuar</button></div>`) + `</div>`;
   $('#obIn')?.focus();
@@ -134,16 +165,16 @@ async function create() {
     const S = ['Diseñando el temario a tu medida', 'Escribiendo tus primeras lecciones'];
     busy('', S, 0); await outline(c);
     busy('', S, 1); await gen(c, 0, 2);
-    C[c.id] = c; save(); list(); home();
+    C[c.id] = c; save(); sfx('done'); home();
   } catch (e) { fail(e.message); }
 }
 function home() {
-  show(); const c = cc, d = c.lessons.filter(l => l.done).length, cur = c.lessons.findIndex(l => !l.done);
+  show(); sync(); const c = cc, d = c.lessons.filter(l => l.done).length, cur = c.lessons.findIndex(l => !l.done);
   let last = '', path = c.lessons.map((l, i) => {
     const s = l.done ? 'done' : i === cur ? 'cur' : 'lock', h = l.module !== last ? `<div class="cv-mod">${esc(l.module)}</div>` : ''; last = l.module;
     return h + `<button class="node ${s}" data-a="les" data-i="${i}" style="--o:${Math.sin(i * 1.1) * 38}px"><span>${l.done ? '✓' : i === cur ? '▶' : '🔒'}</span><em>${esc(l.title)}</em></button>`;
   }).join('');
-  ov.innerHTML = bar('close', d / c.lessons.length * 100) +
+  ov.innerHTML = bar('dash', d / c.lessons.length * 100) +
     `<div class="cv-b"><div class="cv-hero"><h2>${esc(c.title)}</h2><p>${esc(c.desc)}</p><small>${d} / ${c.lessons.length} lecciones · ${Math.round(d / c.lessons.length * 100)}%</small></div><div class="path">${path}</div></div>` +
     `<div class="cv-f"><button class="btn" data-a="prac">🏋️ Practicar / Repasar</button>${cur >= 0 ? `<button class="btn pri" data-a="les" data-i="${cur}">${d ? 'Continuar' : 'Empezar'}</button>` : ''}</div>`;
 }
@@ -161,7 +192,7 @@ async function play(i) {
 function step() {
   if (n >= Q.length) return fin();
   const e = Q[n], pct = n / Q.length * 100;
-  if (e.th) { ov.innerHTML = bar('home', pct) + `<div class="cv-b"><div class="tag">Lección · ${esc(lesson.title)}</div><div class="a"><div class="b">${md(lesson.content.theory)}</div></div></div><div class="cv-f"><button class="btn pri" data-a="nx">Entendido</button></div>`; return; }
+  if (e.th) { ov.innerHTML = bar('home', pct) + `<div class="cv-b"><div class="tag">Lección · ${esc(lesson.title)}</div><div class="a"><div class="b">${md(lesson.content.theory)}</div></div></div><div class="cv-f"><button class="btn pri" data-a="nx" disabled>Desplázate hasta el final ↓</button></div>`; gate(); return; }
   tried = false;
   ov.innerHTML = bar('home', pct) + `<div class="cv-b cv-q"><div class="tag">${e.retry ? 'Inténtalo otra vez' : 'Ejercicio'}</div><h2>${esc(e.q)}</h2>` +
     (e.type === 'fill' ? `<input id="exIn" class="fld cv-in" placeholder="Escribe tu respuesta…" autocomplete="off" autocapitalize="off">`
@@ -169,9 +200,15 @@ function step() {
     `</div><div class="cv-f"><button class="btn pri" data-a="chk" disabled>Comprobar</button></div>`;
   $('#exIn')?.focus();
 }
+function gate() { // "Entendido" se activa al llegar al final de la explicación
+  const b = ov.querySelector('.cv-b'), k = ov.querySelector('[data-a=nx]');
+  const chk = () => { if (b.scrollHeight - b.scrollTop - b.clientHeight < 24) { k.disabled = false; k.textContent = 'Entendido'; b.removeEventListener('scroll', chk); } };
+  b.addEventListener('scroll', chk, {passive: true}); requestAnimationFrame(chk); setTimeout(chk, 350);
+}
 function check() {
   const e = Q[n]; let good, pick = ov.querySelector('.opt.sel'), inp = $('#exIn');
   if (e.type === 'fill') good = norm(inp.value) === norm(e.answer); else good = +pick.dataset.k === e.answer;
+  sfx(good ? 'ok' : 'bad');
   if (good && !e.retry) ok++;
   if (!good && !e.retry) Q.push({...e, retry: 1});
   ov.querySelectorAll('.opt').forEach((o, k) => { o.disabled = true; if (k === e.answer) o.classList.add('good'); else if (o === pick) o.classList.add('bad'); });
@@ -180,37 +217,58 @@ function check() {
   ov.querySelector('.cv-f').outerHTML = `<div class="cv-f fb ${good ? 'ok' : 'no'}"><div class="cv-fb"><b>${good ? '✅ ¡Correcto!' : '❌ Incorrecto'}</b>${ans}${e.why ? `<p>${esc(e.why)}</p>` : ''}</div><button class="btn pri" data-a="nx">Continuar</button></div>`;
 }
 function fin() {
-  const l = lesson, first = !l.done, gain = first ? 20 + ok * 5 : 5, t = new Date().toDateString(), y = new Date(Date.now() - 864e5).toDateString();
-  l.done = true; st.xp += gain; if (st.last !== t) { st.streak = st.last === y ? st.streak + 1 : 1; st.last = t; } save(); list();
+  const l = lesson, first = !l.done, gain = first ? 20 + ok * 5 : 5; sync();
+  const was = st.last === dkey();
+  l.done = true; st.xp += gain; st.acc.ok += ok; st.acc.tot += tot; activate(); save(); sfx('done');
+  const sk = was ? '' : '<p class="tag">🔥 Racha de ' + st.streak + (st.streak > 1 ? ' días' : ' día') + '</p>';
   const d = cc.lessons.filter(x => x.done).length, nx = cc.lessons.findIndex(x => !x.done), all = nx < 0;
-  ov.innerHTML = bar('home', 100) + `<div class="cv-b cv-mid"><div class="cv-big">${all ? '🏆' : '🎉'}</div><h2>${all ? '¡Curso completado!' : '¡Lección completada!'}</h2><p>+${gain} XP · ${ok}/${tot} a la primera</p>${d % 3 === 0 || all ? `<p class="tag">Buen momento para reforzar lo aprendido</p><button class="btn pri" data-a="rv" data-k="${(d / 3) % 2 ? 'flashcards' : 'test'}">⚡ Repaso de refuerzo</button>` : ''}${all ? '' : `<button class="btn ${d % 3 ? 'pri' : ''}" data-a="les" data-i="${nx}">Siguiente lección</button>`}<button class="btn" data-a="home">Ver ruta</button></div>`;
+  ov.innerHTML = bar('home', 100) + `<div class="cv-b cv-mid"><div class="cv-big">${all ? '🏆' : '🎉'}</div><h2>${all ? '¡Curso completado!' : '¡Lección completada!'}</h2><p>+${gain} ⭐ · ${ok}/${tot} a la primera</p>${sk}${d % 3 === 0 || all ? `<p class="tag">Buen momento para reforzar lo aprendido</p><button class="btn pri" data-a="rv" data-k="${(d / 3) % 2 ? 'flashcards' : 'test'}">⚡ Repaso de refuerzo</button>` : ''}${all ? '' : `<button class="btn ${d % 3 ? 'pri' : ''}" data-a="les" data-i="${nx}">Siguiente lección</button>`}<button class="btn" data-a="home">Ver ruta</button></div>`;
 }
 
 // ---------- Lista lateral y eventos ----------
-function list() {
-  const el = $('#clist'); if (!el) return;
-  el.innerHTML = Object.values(C).reverse().map(c => { const d = c.lessons.filter(l => l.done).length; return `<div class="it" data-c="${c.id}"><span class="t">🎓 ${esc(c.title)} · ${Math.round(d / c.lessons.length * 100)}%</span><button data-x="${c.id}" title="Eliminar"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>`; }).join('');
+let cal = new Date(); cal.setDate(1);
+function calHTML() {
+  const y = cal.getFullYear(), m = cal.getMonth(), f = (new Date(y, m, 1).getDay() + 6) % 7, N = new Date(y, m + 1, 0).getDate(), t = dkey();
+  let g = 'LMXJVSD'.split('').map(x => `<span>${x}</span>`).join('') + '<i></i>'.repeat(f);
+  for (let d = 1; d <= N; d++) { const k = `${y}-${pad(m + 1)}-${pad(d)}`, c = st.days.includes(k) ? 'on' : st.prot.includes(k) ? 'sh' : ''; g += `<b class="${c}${k === t ? ' td' : ''}">${c === 'sh' ? '🛡️' : d}</b>`; }
+  return `<div class="cal-h"><button class="ib" data-a="cal" data-d="-1" aria-label="Mes anterior">‹</button><span>${cal.toLocaleDateString('es', {month: 'long', year: 'numeric'})}</span><button class="ib" data-a="cal" data-d="1" aria-label="Mes siguiente">›</button></div><div class="cal-g">${g}</div>`;
+}
+function dash() {
+  show(); sync(); const sc = ov.querySelector('.cv-b')?.scrollTop || 0;
+  const cs = Object.values(C).reverse(), dn = cs.flatMap(c => c.lessons).filter(l => l.done).length, ac = st.acc.tot ? Math.round(st.acc.ok / st.acc.tot * 100) : 0;
+  const wk = [6, 5, 4, 3, 2, 1, 0].map(i => { const k = dkey(-i); return [k, st.hist[k] || 0]; }), mx = Math.max(1, ...wk.map(x => x[1]));
+  const cards = cs.map(c => { const d = c.lessons.filter(l => l.done).length, p = Math.round(d / c.lessons.length * 100); return `<div class="cc" data-a="open" data-c="${c.id}"><div class="cc-i">🎓</div><div class="cc-t"><b>${esc(c.title)}</b><small>${d}/${c.lessons.length} lecciones · ${p}%</small><div class="cc-p"><i style="width:${p}%"></i></div></div><button class="ib" data-a="del" data-c="${c.id}" aria-label="Eliminar curso">🗑</button></div>`; }).join('') || '<p class="mut">Aún no tienes cursos. Crea el primero.</p>';
+  const mt = [['📚', dn, 'Lecciones completadas'], ['🎯', ac + '%', 'Aciertos a la primera'], ['🏅', st.best + (st.best === 1 ? ' día' : ' días'), 'Mejor racha'], ['📅', st.days.length, 'Días activos'], ['🎓', cs.length, 'Cursos'], ['⭐', st.xp, 'Estrellas']];
+  const full = st.shields >= MAXS;
+  ov.innerHTML = bar('close') + `<div class="cv-b dash">
+<div class="ds-stats"><div class="fl"><b>🔥 ${st.streak}</b><small>${st.streak === 1 ? 'día de racha' : 'días de racha'}</small></div><div><b>⭐ ${st.xp}</b><small>estrellas</small></div><div><b>🛡️ ${st.shields}/${MAXS}</b><small>protectores</small></div></div>
+<h3 class="ds-h">Mis cursos</h3>${cards}<button class="btn pri" data-a="new">🎓 Crear curso</button>
+<h3 class="ds-h">Racha</h3><div class="card" id="calW">${calHTML()}</div>
+<div class="card shop"><div class="sp">🛡️</div><div class="ci"><b>Protector de racha</b><small>Si fallas un día, se usa solo y tu racha continúa. Tienes ${st.shields} de ${MAXS}.</small></div><button class="btn pri" data-a="buy" ${full || st.xp < PRICE ? 'disabled' : ''}>${full ? 'Máximo' : PRICE + ' ⭐'}</button></div>
+<h3 class="ds-h">Rendimiento</h3><div class="ds-m">${mt.map(x => `<div><span>${x[0]}</span><b>${x[1]}</b><small>${x[2]}</small></div>`).join('')}</div>
+<div class="card"><small class="mut">Lecciones de los últimos 7 días</small><div class="wk">${wk.map(([k, v]) => `<div><i style="height:${v / mx * 100}%"></i><small>${new Date(k + 'T00:00').toLocaleDateString('es', {weekday: 'narrow'})}</small></div>`).join('')}</div></div>
+<button class="btn" data-a="snd">${st.mute ? '🔇 Sonidos desactivados' : '🔊 Sonidos activados'}</button></div>`;
+  ov.querySelector('.cv-b').scrollTop = sc;
 }
 function init() {
   ov = document.createElement('div'); ov.id = 'cv'; ov.hidden = true; document.body.append(ov);
-  $('.tabs').insertAdjacentHTML('beforebegin', '<button id="cNew" class="btn pri">🎓 Crear curso</button><div id="clist"></div>');
-  $('#cNew').onclick = () => { ob = {i: 0, a: {}}; document.body.classList.remove('open'); onboard(); };
-  $('#clist').onclick = e => {
-    const x = e.target.closest('[data-x]');
-    if (x) { if (confirm('¿Eliminar este curso?')) { delete C[x.dataset.x]; save(); list(); } return; }
-    const it = e.target.closest('[data-c]'); if (it) { cc = C[it.dataset.c]; document.body.classList.remove('open'); home(); }
-  };
+  $('.tabs [data-m=course]').onclick = () => { document.body.classList.remove('open'); dash(); };
   const A = {
-    close: () => { ov.hidden = true; list(); }, home: () => home(), retry: () => retry && retry(), prac: practice,
+    close: () => { ov.hidden = true; }, dash, home: () => home(),
+    open: t => { cc = C[t.dataset.c]; home(); }, new: () => { ob = {i: 0, a: {}}; onboard(); },
+    del: t => { if (confirm('¿Eliminar este curso?')) { delete C[t.dataset.c]; save(); dash(); } },
+    cal: t => { cal.setMonth(cal.getMonth() + +t.dataset.d); $('#calW').innerHTML = calHTML(); },
+    snd: () => { st.mute = !st.mute; save(); sfx('tap'); dash(); },
+    buy: () => { if (st.shields >= MAXS) return toast('Ya tienes el máximo de protectores'); if (st.xp < PRICE) return toast('Te faltan ' + (PRICE - st.xp) + ' ⭐'); st.xp -= PRICE; st.shields++; save(); sfx('buy'); toast('🛡️ Protector comprado'); dash(); }, retry: () => retry && retry(), prac: practice,
     ans: t => { const s = QS[ob.i], v = t.dataset.v ?? $('#obIn').value.trim(); if (!v) return toast('Escribe una respuesta'); ob.a[s.k] = v; ++ob.i < QS.length ? onboard() : create(); },
-    les: t => play(+t.dataset.i), rv: t => review(t.dataset.k), nx: () => { n++; step(); },
+    les: t => play(+t.dataset.i), rv: t => review(t.dataset.k), nx: () => { sfx('tap'); n++; step(); },
     pk: t => { ov.querySelectorAll('.opt').forEach(o => o.classList.toggle('sel', o === t)); ov.querySelector('[data-a=chk]').disabled = false; },
     chk: check
   };
   ov.onclick = e => { const t = e.target.closest('[data-a]'); if (t && !t.disabled) A[t.dataset.a]?.(t); };
   ov.oninput = e => { if (e.target.id === 'exIn') ov.querySelector('[data-a=chk]').disabled = !e.target.value.trim(); };
   ov.onkeydown = e => { if (e.key === 'Enter' && e.target.matches('.cv-in')) { e.preventDefault(); (ov.querySelector('[data-a=chk]:not(:disabled)') || ov.querySelector('.cv-f2 [data-a=ans]'))?.click(); } };
-  kv.get('courses').then(d => { if (d) { C = d.C || {}; Object.assign(st, d.st); } list(); });
+  kv.get('courses').then(d => { if (d) { C = d.C || {}; Object.assign(st, d.st); } mig(); sync(); });
 }
 document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
 })();

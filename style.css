@@ -188,3 +188,50 @@ dialog[open]{animation:pop .2s}
 @media(hover:none){.acts{opacity:1}}
 #dDoc .row{flex-wrap:wrap}
 .ib:focus-visible,.btn:focus-visible,.fld:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+
+/* ===================== Rediseño 2.0 ===================== */
+:root{--bg:#0a0b10;--s1:#12141c;--s2:#1a1d28;--ln:#262a3a;--tx:#eef0f7;--mu:#8e94aa;--ac:#7c83ff;--ac2:#b58cff;--fl:#ff9f43}
+body{font-family:Inter,"SF Pro Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;
+background:radial-gradient(900px 500px at 85% -10%,rgba(124,131,255,.14),transparent 60%),radial-gradient(700px 400px at -10% 110%,rgba(181,140,255,.08),transparent 60%),var(--bg)}
+#side{background:rgba(18,20,28,.94);backdrop-filter:blur(14px)}
+.logo{background:linear-gradient(135deg,var(--ac),var(--ac2));box-shadow:0 6px 18px rgba(124,131,255,.35)}
+.btn{border-radius:12px;transition:background .15s,transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-1px)}
+.btn.pri{background:linear-gradient(135deg,var(--ac),#6a6ff0);border-color:transparent;box-shadow:0 6px 18px rgba(124,131,255,.28)}
+.btn.pri:hover{background:linear-gradient(135deg,#8c92ff,#7479f5)}
+.pill{border-radius:12px;background:rgba(74,222,128,.08)}
+.tabs{background:var(--s2);border:1px solid var(--ln);border-radius:12px;padding:4px}
+.tabs button{padding:7px;border-radius:9px;font-weight:500;transition:.15s}
+.tabs .on{background:var(--ac);color:#fff;box-shadow:0 4px 12px rgba(124,131,255,.3)}
+.tabs button:not(.on):hover{color:var(--tx)}
+.it{border-radius:10px;transition:background .15s,color .15s}
+.it.on{background:linear-gradient(90deg,rgba(124,131,255,.18),transparent);box-shadow:inset 3px 0 var(--ac)}
+.fld,select{border-radius:10px;transition:border-color .15s,box-shadow .15s}
+.fld:focus{box-shadow:0 0 0 3px rgba(124,131,255,.18)}
+header{background:rgba(10,11,16,.7);backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,.06)}
+#title{font-size:16px;letter-spacing:-.01em}
+.m{animation:rise .28s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+.m.u .b{background:linear-gradient(135deg,rgba(124,131,255,.24),rgba(181,140,255,.12));border:1px solid rgba(124,131,255,.35);border-radius:20px 20px 6px 20px}
+.a .b{font-size:15.5px;line-height:1.75}
+.a .b h2{border-bottom:0;padding-bottom:0;letter-spacing:-.01em}
+.a .b blockquote{background:rgba(124,131,255,.06);border-radius:0 10px 10px 0}
+.cb{border-radius:14px;border-color:rgba(255,255,255,.08);box-shadow:0 6px 20px rgba(0,0,0,.3)}
+#empty h2{font-size:28px;letter-spacing:-.02em;background:linear-gradient(90deg,#fff,#b9bcff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.ex button{border-radius:14px;transition:transform .18s,border-color .18s,box-shadow .18s}
+.ex button:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.35)}
+.dock{padding-top:8px}
+#f{border-radius:24px;background:rgba(18,20,28,.92);backdrop-filter:blur(10px);transition:box-shadow .2s,border-color .2s}
+#f:focus-within{box-shadow:0 0 0 3px rgba(124,131,255,.18),0 12px 40px rgba(0,0,0,.45)}
+#go{background:linear-gradient(135deg,var(--ac),var(--ac2));border-radius:16px;transition:transform .15s}
+#go:hover{transform:scale(1.07)}#go.stop{background:var(--s2)}
+.plus{border-radius:14px}
+.chip{border-radius:999px;transition:.15s}.chip:hover{border-color:var(--ac);color:var(--tx)}
+dialog{border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.6);border-color:rgba(255,255,255,.08)}
+dialog::backdrop{background:rgba(5,6,10,.75);backdrop-filter:blur(4px)}
+#toast{background:rgba(26,29,40,.95);backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.tool{border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.opt,.tbtn{border-radius:12px;transition:border-color .15s,background .15s,transform .1s}
+.tbtn.pri{background:linear-gradient(135deg,var(--ac),#6a6ff0)}
+.fc-f{border-radius:18px}
+::-webkit-scrollbar-thumb:hover{background:#363b50}

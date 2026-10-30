@@ -54,7 +54,7 @@ function clearKey() { try { localStorage.removeItem('openrouter_api_key'); } cat
 function resetKey() { if (confirm('¿Borrar la API Key de este navegador?')) { clearKey(); needKey(); } }
 
 const hit = c => { const q = ($('#q')?.value || '').trim().toLowerCase(); return !q || c.title.toLowerCase().includes(q) || c.messages.some(m => m.content.toLowerCase().includes(q)); };
-const vis = () => Object.values(chats).filter(c => (c.type === 'course') === (mode === 'course')).sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+const vis = () => Object.values(chats).sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
 function list() {
   $('#list').innerHTML = vis().filter(hit).map(c => `<div class="it${c.id === cur ? ' on' : ''}" data-id="${esc(c.id)}"><span class="t">${esc(c.title)}</span><button class="rn" title="Renombrar"><svg class="i" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button class="dl" title="Eliminar"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>`).join('') || `<p class="mut">${mode === 'course' ? 'Aún no hay cursos' : 'Aún no hay chats'}</p>`;
 }
@@ -67,10 +67,6 @@ function astUI() {
   s.innerHTML = '<option value="">Sin asistente</option>' + Object.values(asts).map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');
   s.value = cur ? (chats[cur]?.assistantId || '') : (v || 'profesor_educativo');
 }
-function chip() {
-  const on = chats[cur]?.type === 'course', b = $('#course');
-  b.classList.toggle('on', on); b.innerHTML = `<svg class="i" viewBox="0 0 24 24"><path d="M2 9l10-5 10 5-10 5ZM6 11v5c0 1.5 3 3 6 3s6-1.5 6-3v-5"/></svg> ${on ? 'Es curso' : 'Marcar como curso'}`;
-}
 function tabs() { document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.m === mode)); }
 function render() {
   list(); docsUI();
@@ -78,14 +74,14 @@ function render() {
 }
 function blank() {
   cur = null; $('#title').textContent = 'Nueva conversación'; $('#empty').hidden = false; $('#msgs').hidden = true;
-  astUI(); chip(); list();
+  astUI(); list();
 }
 function open(id) {
   cur = id; const c = chats[id], m = $('#msgs');
   $('#title').textContent = c.title; $('#empty').hidden = true; m.hidden = false; m.innerHTML = '';
   const lu = c.messages.map(x => x.role).lastIndexOf('user'), la = c.messages.length - 1;
   c.messages.forEach((x, i) => addMsg(x.role, x.content, (x.role === 'user' ? i === lu : i === la) ? i : -1));
-  astUI(); chip(); list();
+  astUI(); list();
   if (innerWidth <= 860) document.body.classList.remove('open');
   m.scrollTop = m.scrollHeight;
 }
@@ -206,11 +202,6 @@ document.addEventListener('click', e => {
 });
 $('#newBtn').onclick = () => { blank(); document.body.classList.remove('open'); $('#inp').focus(); };
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { mode = b.dataset.m; tabs(); cur = undefined; render(); });
-$('#course').onclick = () => {
-  const c = chats[cur]; if (!c) return toast('Escribe un mensaje primero');
-  c.type = c.type === 'course' ? 'normal' : 'course'; persist(c); mode = c.type; tabs(); list(); chip();
-  toast(c.type === 'course' ? 'Movido a Cursos' : 'Movido a Chats');
-};
 $('#ast').onchange = e => { const c = chats[cur]; if (c) { c.assistantId = e.target.value; persist(c); } };
 $('#model').onchange = e => localStorage.setItem('model', e.target.value);
 $('#title').onclick = () => cur && rename(cur);
