@@ -5,7 +5,7 @@
 'use strict';
 const st = {xp: 0, streak: 0, best: 0, last: '', days: [], prot: [], hist: {}, acc: {ok: 0, tot: 0}, shields: 0, mute: false};
 const PRICE = 50, MAXS = 2;
-let C = {}, cc = null, ov, Q = [], n = 0, lesson = null, ok = 0, tot = 0, retry = null, tried = false;
+let C = {}, cc = null, ov, Q = [], n = 0, lesson = null, ok = 0, tot = 0, retry = null, tried = false, playTok = 0;
 const save = () => kv.set('courses', {C, st});
 const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w ]/g, '').trim();
 // ---------- Fechas, racha y protectores ----------
@@ -56,14 +56,34 @@ async function ai(sys, user) {
   }
   throw Error('La IA devolvió un formato inválido. Inténtalo de nuevo.');
 }
-// Petición 1: estructura completa
+// Petición 1: estructura (curso corto: completa · curso largo: solo la ruta + el primer módulo)
+const SHORT = 8;
+const PHIL = 'FILOSOFÍA: enseña CONCEPTOS MODULARES y reutilizables, no recetas sueltas. Cada lección explica una idea general (p. ej. "cómo mover cualquier objeto": posición, dirección, velocidad) y solo después la aplica en ejemplos; nunca un caso aislado (p. ej. "el script para mover a este personaje"). Cada lección es un bloque que se apoya en el anterior. Vale para cualquier materia (programación, idiomas, música, ciencias, cocina…). El ÚLTIMO elemento de cada módulo es un PROYECTO PRÁCTICO que integra lo aprendido en ese módulo.';
+const ID = 'Eres diseñador instruccional. Creas temarios progresivos y realistas.';
+const mk = (l, m, last) => ({title: String(l.title), summary: String(l.summary || ''), module: String(m), project: !!last, done: false, content: null});
 async function outline(c) {
-  const r = await ai('Eres diseñador instruccional. Creas temarios progresivos y realistas.',
-    `${prof(c)}\nDiseña un curso de ~${c.p.size} lecciones agrupadas en módulos, adaptado al perfil. Ordena de lo concreto a lo abstracto: cada lección debe construir sobre la anterior, sin saltos de dificultad, y el último módulo debe llevar al objetivo del alumno.\nFormato: {"title":"","description":"","modules":[{"title":"","lessons":[{"title":"","summary":"máx 12 palabras"}]}]}`);
+  const sz = c.p.size;
+  if (sz > SHORT) {
+    const r = await ai(ID, `${prof(c)}\n${PHIL}\nDiseña SOLO la ruta de un curso de ~${sz} lecciones en total (cada módulo incluye su proyecto final como última lección). Entrega módulos, no lecciones.\nFormato: {"title":"","description":"","modules":[{"title":"","goal":"máx 15 palabras","lessons":4}]}\nCada módulo tiene entre 3 y 8 lecciones y la suma es ~${sz}. Ordena de lo concreto a lo abstracto; el último módulo lleva al objetivo del alumno.`);
+    c.plan = (r.modules || []).filter(m => m && m.title).map(m => ({title: String(m.title), goal: String(m.goal || ''), n: Math.min(8, Math.max(3, +m.lessons || 4)), x: false}));
+    if (!c.plan.length) throw Error('No se pudo generar el temario.');
+    c.title = r.title || c.p.topic; c.desc = r.description || ''; c.lessons = [];
+    return expand(c);
+  }
+  const r = await ai(ID, `${prof(c)}\n${PHIL}\nDiseña un curso de ~${sz} lecciones en total, agrupadas en módulos (cada módulo termina con su proyecto práctico). Ordena de lo concreto a lo abstracto, sin saltos de dificultad; el último módulo lleva al objetivo del alumno.\nFormato: {"title":"","description":"","modules":[{"title":"","lessons":[{"title":"","summary":"máx 12 palabras"}]}]}`);
   c.title = r.title || c.p.topic; c.desc = r.description || '';
-  c.lessons = (r.modules || []).flatMap(m => (m.lessons || []).map(l => ({title: String(l.title), summary: String(l.summary || ''), module: String(m.title), done: false, content: null})));
+  c.lessons = (r.modules || []).flatMap(m => { const ls = (m.lessons || []).filter(l => l && l.title); return ls.map((l, i) => mk(l, m.title, i === ls.length - 1)); });
   if (!c.lessons.length) throw Error('No se pudo generar el temario.');
 }
+// Cursos largos: despliega el siguiente módulo de la ruta (sus lecciones), solo cuando toca
+async function expand(c) {
+  const k = c.plan.findIndex(m => !m.x); if (k < 0) return;
+  const m = c.plan[k], seen = c.lessons.map(l => l.title).join('; ') || 'ninguna';
+  const r = await ai(ID, `${prof(c)}\n${PHIL}\nCurso: ${c.title}. Ruta: ${c.plan.map((x, j) => (j + 1) + '. ' + x.title).join(' | ')}.\nLecciones ya creadas: ${seen}.\nCrea EXACTAMENTE ${m.n} lecciones del módulo ${k + 1} "${m.title}" (${m.goal}). Cada una construye sobre la anterior y enseña un concepto general; la última es el PROYECTO PRÁCTICO del módulo.\nFormato: {"lessons":[{"title":"","summary":"máx 12 palabras"}]}`);
+  const ls = (r.lessons || []).filter(l => l && l.title); if (!ls.length) throw Error('No se pudo generar el módulo.');
+  ls.forEach((l, i) => c.lessons.push(mk(l, m.title, i === ls.length - 1))); m.n = ls.length; m.x = true; save();
+}
+const tl = c => c.lessons.length + (c.plan ? c.plan.filter(m => !m.x).reduce((a, m) => a + m.n, 0) : 0);
 // Peticiones 2+: lotes de lecciones (teoría + ejercicios)
 const pend = {};
 const fixLesson = x => {
@@ -82,7 +102,7 @@ function gen(c, i, k = 2) {
   const key = c.id + idx[0]; if (pend[key]) return pend[key];
   const seen = c.lessons.filter(l => l.done).map(l => l.title).join('; ') || 'ninguna';
   return pend[key] = ai('Eres un profesor real, cercano y apasionado por enseñar, con años de experiencia explicando a personas de todos los niveles. No eres un manual de referencia: enseñas para que el alumno ENTIENDA. Hablas de tú, con calidez, anticipas dudas y nunca das nada por obvio. Primero el porqué y la intuición, luego el cómo, y solo al final la sintaxis o la fórmula. Nunca sueltes listas secas de tipos, definiciones o código sin explicarlos.',
-    `${prof(c)}\nCurso: ${c.title}. Lecciones ya vistas: ${seen}.\nEscribe estas lecciones, en orden, conectando cada una con lo anterior:\n${idx.map(j => `${j + 1}. ${c.lessons[j].title}: ${c.lessons[j].summary}`).join('\n')}\n\nFormato: {"lessons":[{"theory":"...","exercises":[5 o 6 ejercicios]}]}\n\n"theory" es markdown de 500 a 800 palabras con EXACTAMENTE esta estructura:\n## ¿Por qué importa? (el problema real que resuelve este tema y qué pasaría sin él)\n## La idea, con una analogía (una analogía cotidiana clara, desarrollada en varias frases)\n## Paso a paso (el concepto desglosado en pasos numerados; define cada término nuevo la primera vez que aparece y explica el porqué de cada paso)\n## Ejemplo comentado (si aplica, un ejemplo de código en bloque con triple acento grave y el lenguaje; ANTES de mostrarlo di qué vamos a lograr, y DESPUÉS explica línea por línea qué hace y por qué)\n## Errores típicos (2 o 3 confusiones frecuentes y cómo evitarlas)\n## En resumen (3 ideas clave)\nAdapta la profundidad y el vocabulario al nivel del alumno. En el JSON escapa los saltos de línea como \\n y las comillas dobles internas.\n\nLos ejercicios deben comprobar COMPRENSIÓN (el porqué, predecir resultados, detectar errores, elegir la mejor solución), no memorizar sintaxis. En "why" explica el razonamiento como lo haría un profesor, no solo la respuesta. Mezcla tipos:\n{"type":"choice","q":"","options":["","","",""],"answer":0,"why":""} | {"type":"tf","q":"afirmación","answer":true,"why":""} | {"type":"fill","q":"Frase con ___","answer":"palabra","why":""}`)
+    `${prof(c)}\nCurso: ${c.title}. Lecciones ya vistas: ${seen}.\n${PHIL}\nEscribe estas lecciones, en orden, conectando cada una con lo anterior:\n${idx.map(j => `${j + 1}. ${c.lessons[j].project ? '[PROYECTO] ' : ''}[Módulo: ${c.lessons[j].module}] ${c.lessons[j].title}: ${c.lessons[j].summary}`).join('\n')}\n\nFormato: {"lessons":[{"theory":"...","exercises":[5 o 6 ejercicios; solo 3 si es [PROYECTO]]}]}\n\n"theory" es markdown de 500 a 800 palabras con EXACTAMENTE esta estructura:\n## ¿Por qué importa? (el problema real que resuelve este tema y qué pasaría sin él)\n## La idea, con una analogía (una analogía cotidiana clara, desarrollada en varias frases)\n## Paso a paso (el concepto desglosado en pasos numerados; define cada término nuevo la primera vez que aparece y explica el porqué de cada paso)\n## Ejemplo comentado (si aplica, un ejemplo de código en bloque con triple acento grave y el lenguaje; ANTES de mostrarlo di qué vamos a lograr, y DESPUÉS explica línea por línea qué hace y por qué)\n## Errores típicos (2 o 3 confusiones frecuentes y cómo evitarlas)\n## En resumen (3 ideas clave)\nAdapta la profundidad y el vocabulario al nivel del alumno. Enseña siempre el concepto general antes del ejemplo concreto.\nSi la lección está marcada [PROYECTO], su "theory" (400 a 600 palabras) NO usa esa estructura sino: ## El reto (qué vas a crear y por qué es útil), ## Lo que necesitas (conceptos del módulo que vas a usar), ## Guía paso a paso (pistas y orden de trabajo, SIN dar la solución completa), ## Cómo saber que lo lograste (criterios claros), ## Para ir más lejos (2 ideas extra). Es una tarea práctica real que el alumno hace por su cuenta, adaptada a la materia (código, texto, receta, dibujo, problema…). Sus ejercicios son 3 preguntas de planificación y autoevaluación del proyecto. En el JSON escapa los saltos de línea como \\n y las comillas dobles internas.\n\nLos ejercicios deben comprobar COMPRENSIÓN (el porqué, predecir resultados, detectar errores, elegir la mejor solución), no memorizar sintaxis. En "why" explica el razonamiento como lo haría un profesor, no solo la respuesta. Mezcla tipos:\n{"type":"choice","q":"","options":["","","",""],"answer":0,"why":""} | {"type":"tf","q":"afirmación","answer":true,"why":""} | {"type":"fill","q":"Frase con ___","answer":"palabra","why":""}`)
     .then(r => { idx.forEach((j, q) => { const x = fixLesson(r.lessons?.[q]); if (x) c.lessons[j].content = x; }); save(); if (!c.lessons[idx[0]].content) throw Error('Respuesta incompleta'); })
     .finally(() => delete pend[key]);
 }
@@ -102,7 +122,7 @@ async function review(kind) {
 }
 
 // ---------- Vistas ----------
-const bar = (a, pct = 0) => `<div class="cv-h"><button class="ib" data-a="${a}" aria-label="Salir">✕</button><div class="cv-p"><i style="width:${pct}%"></i></div><span class="cv-st"${a === 'dash' ? ' data-a="dash" title="Ver racha y rendimiento"' : ''}>🔥 ${st.streak} · ⭐ ${st.xp}</span></div>`;
+const bar = (a, pct = 0, q = 0) => `<div class="cv-h"><button class="ib" data-a="${a}" aria-label="Salir">✕</button><div class="cv-p"><i style="width:${pct}%"></i></div>${q ? '<button class="dqb" data-a="dq" aria-label="Preguntar una duda">💬 <span>Dudas</span></button>' : ''}<span class="cv-st"${a === 'dash' ? ' data-a="dash" title="Ver racha y rendimiento"' : ''}>🔥 ${st.streak} · ⭐ ${st.xp}</span></div>`;
 let lt = 0;
 function busy(m, steps = [m], i = 0) {
   clearInterval(lt);
@@ -148,15 +168,34 @@ const QS = [
   {k: 'level', q: '¿Cuál es tu nivel actual?', o: ['Principiante total', 'Conozco lo básico', 'Intermedio', 'Avanzado']},
   {k: 'time', q: '¿Cuánto tiempo puedes dedicar?', o: ['10 min al día', '30 min al día', '1 hora al día', 'Unas horas por semana']},
   {k: 'goal', q: '¿Cuál es tu objetivo específico?', ph: 'Ej: conseguir mi primer empleo como programador'},
-  {k: 'size', q: '¿Qué tan extensa quieres la ruta?', o: ['Corta (~8 lecciones)', 'Media (~16 lecciones)', 'Extensa (~30 lecciones)', 'Maestría (~50 lecciones)']}
+  {k: 'size', q: '¿Qué tan extensa quieres la ruta?', o: ['Corta (~8 lecciones)', 'Media (~16 lecciones)', 'Extensa (~30 lecciones)', 'Maestría (~50 lecciones)', '✏️ Modo personalizado (hasta 100)']}
 ];
 let ob = {i: 0, a: {}};
 function onboard() {
-  show(); const s = QS[ob.i];
+  show(); dqHide(); playTok++; const s = QS[ob.i];
   ov.innerHTML = bar('dash', ob.i / QS.length * 100) + `<div class="cv-b cv-q"><h2>${s.q}</h2>` +
-    (s.o ? `<div class="opts">${s.o.map((o, k) => `<button class="opt" data-a="ans" data-v="${esc(o)}">${esc(o)}</button>`).join('')}</div>`
+    (s.o ? `<div class="opts">${s.o.map((o, k) => `<button class="opt" data-a="${o.startsWith('✏️') ? 'custom' : 'ans'}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}</div>`
       : `<input id="obIn" class="fld cv-in" placeholder="${esc(s.ph)}" autocomplete="off"><div class="cv-f2"><button class="btn pri" data-a="ans">Continuar</button></div>`) + `</div>`;
   $('#obIn')?.focus();
+}
+function custom(v = 20) {
+  show(); v = Math.min(100, Math.max(1, Math.round(+v) || 20));
+  ov.innerHTML = bar('dash', 90) + `<div class="cv-b cv-q"><div class="tag">Modo personalizado</div><h2>¿Cuántas lecciones quieres?</h2><div class="cn"><button class="ib" data-a="cn" data-d="-1" aria-label="Menos">−</button><input id="cn" class="fld cv-in" type="number" inputmode="numeric" min="1" max="100" value="${v}"><button class="ib" data-a="cn" data-d="1" aria-label="Más">+</button></div><input id="cr" type="range" min="1" max="100" value="${v}" aria-label="Número de lecciones"><p id="cnh" class="mut"></p><div class="cv-f2"><button class="btn" data-a="back">← Volver</button><button class="btn pri" data-a="cok">Continuar</button></div></div>`;
+  setCn(v);
+}
+function setCn(v, from) {
+  if (v === '') return; v = Math.min(100, Math.max(1, Math.round(+v) || 1));
+  const a = $('#cn'); if (from !== 'cn' || +a.value !== v) a.value = v; $('#cr').value = v;
+  $('#cnh').textContent = v <= SHORT ? 'Curso corto: lo creo completo.' : 'Curso largo: lo creo por módulos, a medida que avances.';
+}
+async function nextMod() {
+  const c = cc; retry = nextMod;
+  try {
+    const S = ['Diseñando el siguiente módulo', 'Escribiendo sus primeras lecciones'];
+    if (c.lessons.findIndex(l => !l.done) < 0) { busy('', S, 0); await expand(c); }
+    busy('', S, 1); await gen(c, c.lessons.findIndex(l => !l.done), 2);
+    save(); sfx('done'); home(); toast('✨ Módulo nuevo listo');
+  } catch (e) { fail(e.message); }
 }
 async function create() {
   const a = ob.a, c = {id: 'c_' + Date.now(), p: {topic: a.topic, level: a.level, time: a.time, goal: a.goal, size: +(a.size.match(/\d+/) || [12])[0]}, lessons: []};
@@ -169,32 +208,46 @@ async function create() {
   } catch (e) { fail(e.message); }
 }
 function home() {
-  show(); sync(); const c = cc, d = c.lessons.filter(l => l.done).length, cur = c.lessons.findIndex(l => !l.done);
-  let last = '', path = c.lessons.map((l, i) => {
-    const s = l.done ? 'done' : i === cur ? 'cur' : 'lock', h = l.module !== last ? `<div class="cv-mod">${esc(l.module)}</div>` : ''; last = l.module;
-    return h + `<button class="node ${s}" data-a="les" data-i="${i}" style="--o:${Math.sin(i * 1.1) * 38}px"><span>${l.done ? '✓' : i === cur ? '▶' : '🔒'}</span><em>${esc(l.title)}</em></button>`;
-  }).join('');
-  ov.innerHTML = bar('dash', d / c.lessons.length * 100) +
-    `<div class="cv-b"><div class="cv-hero"><h2>${esc(c.title)}</h2><p>${esc(c.desc)}</p><small>${d} / ${c.lessons.length} lecciones · ${Math.round(d / c.lessons.length * 100)}%</small></div><div class="path">${path}</div></div>` +
-    `<div class="cv-f"><button class="btn" data-a="prac">🏋️ Practicar / Repasar</button>${cur >= 0 ? `<button class="btn pri" data-a="les" data-i="${cur}">${d ? 'Continuar' : 'Empezar'}</button>` : ''}</div>`;
+  show(); dqHide(); playTok++; sync();
+  const c = cc, d = c.lessons.filter(l => l.done).length, T = tl(c), cur = c.lessons.findIndex(l => !l.done), g = [];
+  c.lessons.forEach((l, i) => { let m = g[g.length - 1]; if (!m || m.t !== l.module) g.push(m = {t: l.module, ls: []}); m.ls.push([l, i]); });
+  const row = ([l, i]) => `<button class="lr ${l.done ? 'done' : i === cur ? 'cur' : 'lock'}" data-a="les" data-i="${i}"><span class="lr-i">${l.done ? '✓' : i === cur ? '▶' : l.project ? '🛠️' : '🔒'}</span><span class="lr-t"><b>${esc(l.title)}</b><small>${esc(l.summary)}</small></span>${l.project ? '<em class="lr-b">Proyecto</em>' : ''}</button>`;
+  const mods = g.map((m, k) => `<section class="mc"><div class="mc-h"><b><em>${k + 1}</em>${esc(m.t)}</b><small>${m.ls.filter(x => x[0].done).length}/${m.ls.length}</small></div>${m.ls.map(row).join('')}</section>`).join('');
+  const later = c.plan ? c.plan.map((m, j) => [m, j]).filter(x => !x[0].x) : [];
+  const soon = later.map(([m, j]) => `<section class="mc lock"><div class="mc-h"><b><em>${j + 1}</em>${esc(m.title)}</b><small>🔒 ~${m.n} lecciones</small></div></section>`).join('');
+  const note = later.length ? '<div class="cv-note">🌱 Este curso es largo, así que lo voy creando por partes. Cuando termines el módulo actual te aviso y preparo el siguiente.</div>' : '';
+  ov.innerHTML = bar('dash', d / T * 100) +
+    `<div class="cv-b"><div class="cv-hero"><h2>${esc(c.title)}</h2><p>${esc(c.desc)}</p><small>${d} / ${T} lecciones · ${Math.round(d / T * 100)}%</small></div>${note}${mods}${soon}</div>` +
+    `<div class="cv-f"><button class="btn" data-a="prac">🏋️ Practicar / Repasar</button>${cur >= 0 ? `<button class="btn pri" data-a="les" data-i="${cur}">${d ? 'Continuar' : 'Empezar'}</button>` : later.length ? '<button class="btn pri" data-a="nm">🌱 Crear siguiente módulo</button>' : ''}</div>`;
+  ov.querySelector('.lr.cur')?.scrollIntoView({block: 'center'});
 }
 function practice() {
   ov.innerHTML = bar('home') + `<div class="cv-b cv-q"><h2>¿Cómo quieres practicar?</h2><div class="opts"><button class="opt" data-a="rv" data-k="test">📝 Ensayo de práctica (quiz)</button><button class="opt" data-a="rv" data-k="flashcards">🗂️ Tarjetas de memoria</button></div></div>`;
 }
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function intro(l, i) {
+  ov.innerHTML = bar('home') + `<div class="cv-b cv-mid cv-intro"><div class="tag">${esc(l.module)}</div><div class="cv-big">${l.project ? '🛠️' : '📖'}</div><h2>${esc(l.title)}</h2><p class="mut">${l.project ? 'Proyecto del módulo' : 'Lección ' + (i + 1) + ' de ' + tl(cc)}</p><div class="intro-bar"><i></i></div><p class="mut">Preparando tu lección…</p></div>`;
+}
 async function play(i) {
   const c = cc, l = c.lessons[i];
   if (i > c.lessons.findIndex(x => !x.done) && !l.done) return toast('Completa las lecciones anteriores');
-  retry = () => play(i);
-  if (!l.content) { busy('Redactando la explicación y los ejercicios…'); try { await gen(c, i, 2); } catch (e) { return fail(e.message); } }
+  retry = () => play(i); const my = ++playTok, t0 = Date.now(); intro(l, i);
+  if (!l.content) {
+    const slow = setTimeout(() => { if (my === playTok) busy('Redactando la explicación y los ejercicios…'); }, 4000);
+    try { await gen(c, i, 2); } catch (e) { clearTimeout(slow); if (my === playTok) fail(e.message); return; }
+    clearTimeout(slow);
+  }
+  await wait(Math.max(0, 1100 - (Date.now() - t0)));
+  if (my !== playTok) return;
   gen(c, i + 1, 2).catch(() => { }); // generación progresiva en segundo plano
-  lesson = l; Q = [{th: 1}, ...l.content.ex.map(e => ({...e}))]; n = 0; ok = 0; tot = l.content.ex.length; step();
+  lesson = l; Q = [{th: 1}, ...l.content.ex.map(e => ({...e}))]; n = 0; ok = 0; tot = l.content.ex.length; step(); dqRefresh();
 }
 function step() {
   if (n >= Q.length) return fin();
   const e = Q[n], pct = n / Q.length * 100;
-  if (e.th) { ov.innerHTML = bar('home', pct) + `<div class="cv-b"><div class="tag">Lección · ${esc(lesson.title)}</div><div class="a"><div class="b">${md(lesson.content.theory)}</div></div></div><div class="cv-f"><button class="btn pri" data-a="nx" disabled>Desplázate hasta el final ↓</button></div>`; gate(); return; }
+  if (e.th) { ov.innerHTML = bar('home', pct, 1) + `<div class="cv-b"><div class="tag">Lección · ${esc(lesson.title)}</div><div class="a"><div class="b">${md(lesson.content.theory)}</div></div></div><div class="cv-f"><button class="btn pri" data-a="nx" disabled>Desplázate hasta el final ↓</button></div>`; gate(); return; }
   tried = false;
-  ov.innerHTML = bar('home', pct) + `<div class="cv-b cv-q"><div class="tag">${e.retry ? 'Inténtalo otra vez' : 'Ejercicio'}</div><h2>${esc(e.q)}</h2>` +
+  ov.innerHTML = bar('home', pct, 1) + `<div class="cv-b cv-q"><div class="tag">${e.retry ? 'Inténtalo otra vez' : 'Ejercicio'}</div><h2>${esc(e.q)}</h2>` +
     (e.type === 'fill' ? `<input id="exIn" class="fld cv-in" placeholder="Escribe tu respuesta…" autocomplete="off" autocapitalize="off">`
       : `<div class="opts">${e.options.map((o, k) => `<button class="opt" data-a="pk" data-k="${k}">${esc(o)}</button>`).join('')}</div>`) +
     `</div><div class="cv-f"><button class="btn pri" data-a="chk" disabled>Comprobar</button></div>`;
@@ -221,8 +274,56 @@ function fin() {
   const was = st.last === dkey();
   l.done = true; st.xp += gain; st.acc.ok += ok; st.acc.tot += tot; activate(); save(); sfx('done');
   const sk = was ? '' : '<p class="tag">🔥 Racha de ' + st.streak + (st.streak > 1 ? ' días' : ' día') + '</p>';
-  const d = cc.lessons.filter(x => x.done).length, nx = cc.lessons.findIndex(x => !x.done), all = nx < 0;
-  ov.innerHTML = bar('home', 100) + `<div class="cv-b cv-mid"><div class="cv-big">${all ? '🏆' : '🎉'}</div><h2>${all ? '¡Curso completado!' : '¡Lección completada!'}</h2><p>+${gain} ⭐ · ${ok}/${tot} a la primera</p>${sk}${d % 3 === 0 || all ? `<p class="tag">Buen momento para reforzar lo aprendido</p><button class="btn pri" data-a="rv" data-k="${(d / 3) % 2 ? 'flashcards' : 'test'}">⚡ Repaso de refuerzo</button>` : ''}${all ? '' : `<button class="btn ${d % 3 ? 'pri' : ''}" data-a="les" data-i="${nx}">Siguiente lección</button>`}<button class="btn" data-a="home">Ver ruta</button></div>`;
+  const d = cc.lessons.filter(x => x.done).length, nx = cc.lessons.findIndex(x => !x.done);
+  const more = nx < 0 && cc.plan && cc.plan.some(m => !m.x), all = nx < 0 && !more, mod = l.project, nm = more ? cc.plan.find(m => !m.x) : null;
+  ov.innerHTML = bar('home', 100) + `<div class="cv-b cv-mid"><div class="cv-big">${all ? '🏆' : mod ? '🏁' : '🎉'}</div><h2>${all ? '¡Curso completado!' : mod ? '¡Módulo completado!' : '¡Lección completada!'}</h2><p>+${gain} ⭐ · ${ok}/${tot} a la primera</p>${sk}${mod ? '<p class="cv-note">🛠️ Si aún no hiciste el proyecto del módulo, tómate un rato para construirlo por tu cuenta: es lo que fija de verdad lo aprendido.</p>' : ''}${more ? `<p class="cv-note">🌱 Para no abrumarte, creo el curso por partes. Ahora preparo el siguiente módulo, «${esc(nm.title)}», a medida que avanzas.</p><button class="btn pri" data-a="nm">🌱 Crear el siguiente módulo</button>` : ''}${d % 3 === 0 || all ? `<p class="tag">Buen momento para reforzar lo aprendido</p><button class="btn pri" data-a="rv" data-k="${(d / 3) % 2 ? 'flashcards' : 'test'}">⚡ Repaso de refuerzo</button>` : ''}${all || more ? '' : `<button class="btn ${d % 3 ? 'pri' : ''}" data-a="les" data-i="${nx}">Siguiente lección</button>`}<button class="btn" data-a="home">Ver ruta</button></div>`;
+}
+
+// ---------- 3. Chat lateral de dudas ----------
+let dq, dqBusy = false;
+function dqEnsure() {
+  if (dq) return dq;
+  dq = document.createElement('aside'); dq.id = 'dq'; dq.hidden = true;
+  dq.innerHTML = '<div class="dq-h"><div><b>💬 Dudas de la lección</b><small id="dqT"></small></div><button class="ib" type="button" aria-label="Cerrar">✕</button></div><div id="dqM" class="dq-m"></div><form id="dqF" class="dq-f"><textarea id="dqI" rows="1" placeholder="Pregunta lo que no entendiste…"></textarea><button class="btn pri" type="submit">Enviar</button></form>';
+  document.body.append(dq);
+  const f = dq.querySelector('form'), i = dq.querySelector('textarea');
+  dq.querySelector('.dq-h .ib').onclick = dqHide;
+  f.onsubmit = e => { e.preventDefault(); const t = i.value; i.value = ''; i.style.height = 'auto'; dqSend(t); };
+  i.oninput = () => { i.style.height = 'auto'; i.style.height = Math.min(120, i.scrollHeight) + 'px'; };
+  i.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && matchMedia('(pointer:fine)').matches) { e.preventDefault(); f.requestSubmit(); } };
+  dq.onclick = e => { const b = e.target.closest('[data-s]'); if (b) dqSend(b.dataset.s); };
+  return dq;
+}
+function dqToggle() {
+  dqEnsure(); if (!dq.hidden) return dqHide();
+  dq.hidden = false; document.body.classList.add('dq-on'); dqRefresh();
+  if (matchMedia('(pointer:fine)').matches) $('#dqI').focus();
+}
+function dqHide() { if (dq) dq.hidden = true; document.body.classList.remove('dq-on'); }
+function dqRefresh() {
+  if (!dq || dq.hidden || !lesson) return;
+  const ch = lesson.chat || [], m = $('#dqM'), tips = ['Explícamelo de otra forma', 'Dame otro ejemplo', '¿Para qué sirve esto?'];
+  $('#dqT').textContent = lesson.title; $('#dqF .btn').disabled = dqBusy;
+  m.innerHTML = (ch.length ? '' : `<p class="mut">Pregunta lo que no te quedó claro de esta lección: puedo explicarlo de otra forma, dar otro ejemplo o aclarar un término.</p><div class="dq-s">${tips.map(t => `<button type="button" data-s="${esc(t)}">${esc(t)}</button>`).join('')}</div>`)
+    + ch.map(x => `<div class="m ${x.role === 'user' ? 'u' : 'a'}"><div class="b">${x.role === 'user' ? esc(x.content) : md(x.content)}</div></div>`).join('')
+    + (dqBusy ? '<div class="m a"><div class="b cur"></div></div>' : '');
+  window.Tools && Tools.mount(m); m.scrollTop = m.scrollHeight;
+}
+async function dqSend(t) {
+  t = t.trim(); const l = lesson, c = cc; if (!t || dqBusy || !l) return;
+  if (!apiKey) return needKey();
+  (l.chat = l.chat || []).push({role: 'user', content: t}); dqBusy = true; dqRefresh();
+  try {
+    const sys = `Eres un tutor paciente y cercano de un curso. Respondes en español, de tú, claro y breve (máx. ~200 palabras) y con markdown ligero. Si el alumno no entendió algo, explícalo de otra forma, con una analogía o un ejemplo distinto. Enseñas conceptos generales, no recetas sueltas. No resuelvas los ejercicios por el alumno: guíalo con pistas. Si la lección es un proyecto, ayúdalo a avanzar sin darle la solución completa. ${prof(c)}\nCurso: ${c.title}. Módulo: ${l.module}. Lección actual: ${l.title}.\nContenido de la lección (contexto):\n${(l.content?.theory || '').slice(0, 3500)}`;
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST', headers: {'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json', 'HTTP-Referer': location.href, 'X-Title': 'Sara AI App'},
+      body: JSON.stringify({model: 'openrouter/auto', temperature: .5, messages: [{role: 'system', content: sys}, ...l.chat.slice(-10).map(({role, content}) => ({role, content}))]})
+    });
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw Error(j.error?.message || 'Error ' + r.status);
+    const a = (j.choices?.[0]?.message?.content || '').trim(); if (!a) throw Error('Respuesta vacía');
+    l.chat.push({role: 'assistant', content: a}); save();
+  } catch (e) { l.chat.pop(); if (dq) $('#dqI').value = t; toast(e.message); }
+  finally { dqBusy = false; dqRefresh(); }
 }
 
 // ---------- Lista lateral y eventos ----------
@@ -234,10 +335,10 @@ function calHTML() {
   return `<div class="cal-h"><button class="ib" data-a="cal" data-d="-1" aria-label="Mes anterior">‹</button><span>${cal.toLocaleDateString('es', {month: 'long', year: 'numeric'})}</span><button class="ib" data-a="cal" data-d="1" aria-label="Mes siguiente">›</button></div><div class="cal-g">${g}</div>`;
 }
 function dash() {
-  show(); sync(); const sc = ov.querySelector('.cv-b')?.scrollTop || 0;
+  show(); dqHide(); playTok++; sync(); const sc = ov.querySelector('.cv-b')?.scrollTop || 0;
   const cs = Object.values(C).reverse(), dn = cs.flatMap(c => c.lessons).filter(l => l.done).length, ac = st.acc.tot ? Math.round(st.acc.ok / st.acc.tot * 100) : 0;
   const wk = [6, 5, 4, 3, 2, 1, 0].map(i => { const k = dkey(-i); return [k, st.hist[k] || 0]; }), mx = Math.max(1, ...wk.map(x => x[1]));
-  const cards = cs.map(c => { const d = c.lessons.filter(l => l.done).length, p = Math.round(d / c.lessons.length * 100); return `<div class="cc" data-a="open" data-c="${c.id}"><div class="cc-i">🎓</div><div class="cc-t"><b>${esc(c.title)}</b><small>${d}/${c.lessons.length} lecciones · ${p}%</small><div class="cc-p"><i style="width:${p}%"></i></div></div><button class="ib" data-a="del" data-c="${c.id}" aria-label="Eliminar curso">🗑</button></div>`; }).join('') || '<p class="mut">Aún no tienes cursos. Crea el primero.</p>';
+  const cards = cs.map(c => { const d = c.lessons.filter(l => l.done).length, T = tl(c), p = Math.round(d / T * 100); return `<div class="cc" data-a="open" data-c="${c.id}"><div class="cc-i">🎓</div><div class="cc-t"><b>${esc(c.title)}</b><small>${d}/${T} lecciones · ${p}%</small><div class="cc-p"><i style="width:${p}%"></i></div></div><button class="ib" data-a="del" data-c="${c.id}" aria-label="Eliminar curso">🗑</button></div>`; }).join('') || '<p class="mut">Aún no tienes cursos. Crea el primero.</p>';
   const mt = [['📚', dn, 'Lecciones completadas'], ['🎯', ac + '%', 'Aciertos a la primera'], ['🏅', st.best + (st.best === 1 ? ' día' : ' días'), 'Mejor racha'], ['📅', st.days.length, 'Días activos'], ['🎓', cs.length, 'Cursos'], ['⭐', st.xp, 'Estrellas']];
   const full = st.shields >= MAXS;
   ov.innerHTML = bar('close') + `<div class="cv-b dash">
@@ -254,7 +355,7 @@ function init() {
   ov = document.createElement('div'); ov.id = 'cv'; ov.hidden = true; document.body.append(ov);
   $('.tabs [data-m=course]').onclick = () => { document.body.classList.remove('open'); dash(); };
   const A = {
-    close: () => { ov.hidden = true; }, dash, home: () => home(),
+    close: () => { ov.hidden = true; dqHide(); playTok++; }, dash, home: () => home(),
     open: t => { cc = C[t.dataset.c]; home(); }, new: () => { ob = {i: 0, a: {}}; onboard(); },
     del: t => { if (confirm('¿Eliminar este curso?')) { delete C[t.dataset.c]; save(); dash(); } },
     cal: t => { cal.setMonth(cal.getMonth() + +t.dataset.d); $('#calW').innerHTML = calHTML(); },
@@ -263,11 +364,14 @@ function init() {
     ans: t => { const s = QS[ob.i], v = t.dataset.v ?? $('#obIn').value.trim(); if (!v) return toast('Escribe una respuesta'); ob.a[s.k] = v; ++ob.i < QS.length ? onboard() : create(); },
     les: t => play(+t.dataset.i), rv: t => review(t.dataset.k), nx: () => { sfx('tap'); n++; step(); },
     pk: t => { ov.querySelectorAll('.opt').forEach(o => o.classList.toggle('sel', o === t)); ov.querySelector('[data-a=chk]').disabled = false; },
-    chk: check
+    chk: check,
+    dq: dqToggle, custom: () => custom(), back: onboard, nm: nextMod,
+    cn: t => setCn(+$('#cn').value + +t.dataset.d),
+    cok: () => { const v = Math.min(100, Math.max(1, Math.round(+$('#cn').value) || 0)); if (!v) return toast('Elige entre 1 y 100'); ob.a.size = 'Personalizado (' + v + ' lecciones)'; create(); }
   };
   ov.onclick = e => { const t = e.target.closest('[data-a]'); if (t && !t.disabled) A[t.dataset.a]?.(t); };
-  ov.oninput = e => { if (e.target.id === 'exIn') ov.querySelector('[data-a=chk]').disabled = !e.target.value.trim(); };
-  ov.onkeydown = e => { if (e.key === 'Enter' && e.target.matches('.cv-in')) { e.preventDefault(); (ov.querySelector('[data-a=chk]:not(:disabled)') || ov.querySelector('.cv-f2 [data-a=ans]'))?.click(); } };
+  ov.oninput = e => { const i = e.target.id; if (i === 'exIn') ov.querySelector('[data-a=chk]').disabled = !e.target.value.trim(); else if (i === 'cn' || i === 'cr') setCn(e.target.value, i); };
+  ov.onkeydown = e => { if (e.key === 'Enter' && e.target.matches('.cv-in')) { e.preventDefault(); (ov.querySelector('[data-a=chk]:not(:disabled)') || ov.querySelector('.cv-f2 .btn.pri'))?.click(); } };
   kv.get('courses').then(d => { if (d) { C = d.C || {}; Object.assign(st, d.st); } mig(); sync(); });
 }
 document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();

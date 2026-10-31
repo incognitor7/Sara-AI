@@ -217,7 +217,7 @@ header{background:rgba(10,11,16,.7);backdrop-filter:blur(14px);border-bottom:1px
 .a .b h2{border-bottom:0;padding-bottom:0;letter-spacing:-.01em}
 .a .b blockquote{background:rgba(124,131,255,.06);border-radius:0 10px 10px 0}
 .cb{border-radius:14px;border-color:rgba(255,255,255,.08);box-shadow:0 6px 20px rgba(0,0,0,.3)}
-#empty h2{font-size:28px;letter-spacing:-.02em;background:linear-gradient(90deg,#fff,#b9bcff);-webkit-background-clip:text;background-clip:text;color:transparent}
+#empty h2{font-size:28px;letter-spacing:-.02em;color:#f4f5fb;text-shadow:0 2px 24px rgba(124,131,255,.35)}
 .ex button{border-radius:14px;transition:transform .18s,border-color .18s,box-shadow .18s}
 .ex button:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.35)}
 .dock{padding-top:8px}
