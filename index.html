@@ -11,13 +11,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="course.css">
+<link rel="stylesheet" href="study.css">
 </head>
 <body>
 <aside id="side">
   <div class="sh"><span><b class="logo">S</b>Sara AI</span><button id="x" class="ib"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
   <div class="pill ok"><svg class="i" viewBox="0 0 24 24"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM8 12l3 3 5-6"/></svg> Guardado en este navegador</div>
   <button id="newBtn" class="btn pri"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Nuevo chat</button>
-  <div class="tabs"><button data-m="normal" class="on">Chats</button><button data-m="course">🎓 Cursos</button></div>
+  <div class="tabs"><button data-m="normal" class="on">Chats</button><button data-m="notebook">📓 Cuadernos</button><button data-m="course">🎓 Cursos</button></div>
   <input id="q" type="search" class="fld" placeholder="Buscar en tus chats…" aria-label="Buscar chats" autocomplete="off">
   <div id="list"></div>
   <div class="foot">
@@ -88,8 +89,10 @@
   <div class="row"><button id="key0Save" class="btn pri" type="button">Guardar y empezar</button></div>
 </dialog>
 <div id="toast"></div>
+<script src="rich.js"></script>
 <script src="tools.js"></script>
 <script src="script.js"></script>
+<script src="notebooks.js"></script>
 <script src="course.js"></script>
 </body>
 </html>

@@ -17,13 +17,15 @@ const BASE = [
   'Test (mezcla opción múltiple, mayoría, y alguna pregunta abierta; "answer" es el índice de la opción correcta empezando en 0): {"tool":"test","title":"Título","questions":[{"type":"choice","q":"Pregunta","options":["A","B","C","D"],"answer":1,"explanation":"Por qué"},{"type":"text","q":"Pregunta abierta"}]}',
   'Flashcards (opcionalmente con "options" y "answer" para elegir la respuesta): {"tool":"flashcards","title":"Título","cards":[{"front":"Pregunta","back":"Respuesta"},{"front":"Pregunta","options":["A","B","C"],"answer":0,"back":"Explicación"}]}',
   'Podcast (exactamente dos personas, español natural, frases cortas, 8 a 16 intervenciones): {"tool":"podcast","title":"Título","dialogue":[{"speaker":"Ana","text":"..."},{"speaker":"Luis","text":"..."}]}',
+  'REGLA DE CÓDIGO: todo código (también dentro de preguntas, opciones, respuestas y explicaciones del JSON) va en bloques ```lang con los saltos de línea escritos como \\n; el código corto en una frase va entre `acentos graves`. Nunca código como texto plano.',
   'Si el usuario envía respuestas de un test, corrígelas con retroalimentación amable. En cualquier otro caso responde con normalidad, sin JSON.'
 ].join('\n');
 
 // ---------- utilidades ----------
 const $ = s => document.querySelector(s);
 const h = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
-const btn = (label, fn, cls = '') => { const b = h('button', 'tbtn' + (cls ? ' ' + cls : ''), label); b.type = 'button'; b.onclick = fn; return b; };
+const btn = (label, fn, cls = '') => { const b = h('button', 'tbtn' + (cls ? ' ' + cls : '')); if (/\bopt\b/.test(cls) && window.Rich) b.innerHTML = Rich.rich(label); else b.textContent = label; b.type = 'button'; b.onclick = fn; return b; };
+const rt = (cls, t) => { const e = h('div', cls); e.innerHTML = Rich.rich(t); return e; };
 const str = v => v == null ? '' : String(v).trim();
 const arr = v => Array.isArray(v) ? v : [];
 const note = m => { if (typeof toast === 'function') toast(m); };
@@ -88,7 +90,7 @@ function flashcards(root, d) {
     graded = false; const c = deck[i]; stage.innerHTML = ''; fill.style.width = i / deck.length * 100 + '%';
     const fc = h('div', 'fc'), inner = h('div', 'fc-in'), f = h('div', 'fc-f'), b = h('div', 'fc-f fc-b'), bar = h('div', 'tl-bar');
     f.dataset.l = 'Pregunta'; b.dataset.l = 'Respuesta';
-    f.append(h('div', 'fc-x', c.front)); b.append(h('div', 'fc-x', c.back)); inner.append(f, b); fc.append(inner);
+    f.append(rt('fc-x', c.front)); b.append(rt('fc-x', c.back)); inner.append(f, b); fc.append(inner);
     stage.append(h('div', 'tl-c', (i + 1) + ' / ' + deck.length + '  ·  ✅ ' + ok + '  ·  ❌ ' + bad), fc);
     let shown = false;
     const rate = () => bar.append(btn('❌ No la sabía', () => { grade(false); next(); }, 'bad'), btn('✅ La sabía', () => { grade(true); next(); }, 'good'));
@@ -236,12 +238,12 @@ function test(root, d) {
   const grow = t => { t.style.height = 'auto'; t.style.height = Math.max(76, t.scrollHeight + 2) + 'px'; };
   const tas = [];
   d.questions.forEach((q, k) => {
-    const box = h('div', 'ts-q'); box.append(h('div', 'ts-p', (k + 1) + '. ' + q.q));
+    const box = h('div', 'ts-q'), pq = h('div', 'ts-p'); pq.innerHTML = '<span class="qn">' + (k + 1) + '.</span><div>' + Rich.rich(q.q) + '</div>'; box.append(pq);
     if (q.opts) {
       const ol = h('div', 'opts'), why = h('div', 'why'); why.hidden = true;
       const lock = () => { [...ol.children].forEach((x, m) => { x.disabled = true; if (m === q.ans) x.classList.add('good'); else if (m === st[k].s) x.classList.add('bad'); });
-        why.textContent = (st[k].s === q.ans ? '✅ ¡Correcto! ' : '❌ Incorrecto. Respuesta: ' + q.opts[q.ans] + '. ') + (q.why || ''); why.hidden = false; };
-      q.opts.forEach((o, m) => ol.append(btn(String.fromCharCode(65 + m) + ') ' + o, () => { if (st[k].s !== null) return; st[k].s = m; lock(); save(); }, 'opt')));
+        why.innerHTML = '<b>' + (st[k].s === q.ans ? '✅ ¡Correcto!' : '❌ Incorrecto') + '</b>' + Rich.rich(q.why || ''); why.hidden = false; };
+      q.opts.forEach((o, m) => ol.append(btn(o, () => { if (st[k].s !== null) return; st[k].s = m; lock(); save(); }, 'opt')));
       box.append(ol, why); if (st[k].s !== null) lock();
     } else {
       const t = h('textarea'); t.placeholder = 'Escribe tu respuesta…'; t.value = st[k].t; t.setAttribute('aria-label', 'Respuesta ' + (k + 1));

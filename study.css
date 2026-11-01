@@ -1,0 +1,49 @@
+/* Sara AI · Estudio: pulido de interfaz, cuadernos y código en lecciones/preguntas (cargar al final) */
+:root{--bg:#0b0d12;--s1:#12151d;--s2:#1a1e2a;--ln:#252a38}
+#side{width:300px}
+.tabs button{font-size:12.5px;padding:7px 4px;white-space:nowrap}
+#msgs{padding-inline:max(16px,calc((100% - 820px)/2))}
+.dock{max-width:840px}
+.a .b{font-size:16px;line-height:1.8}
+.a .b p{max-width:68ch}
+.m.u .b{border-radius:18px 18px 6px 18px}
+.btn:focus-visible,.nb-c button:focus-visible,#nbBar button:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+
+/* ---- Cuadernos ---- */
+#nbEmpty{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center}
+#nbEmpty .logo{width:58px;height:58px;border-radius:18px;font-size:26px}
+#nbEmpty h2{font-size:26px;letter-spacing:-.02em}
+#nbEmpty p{color:var(--mu);max-width:420px}
+#nbEmpty .btn{width:auto;padding:12px 24px}
+.nbx{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:540px;margin-top:6px}
+.nbx span{padding:8px 12px;border-radius:999px;background:var(--s1);border:1px solid var(--ln);font-size:13px;color:var(--mu)}
+#nbBar{flex-shrink:0;display:flex;flex-direction:column;gap:8px;padding:10px max(16px,calc((100% - 820px)/2));border-bottom:1px solid var(--ln);background:var(--s1)}
+.nb-t{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--mu)}
+.nb-t button{padding:5px 12px;border-radius:999px;border:1px solid var(--ln);background:var(--s2);color:var(--tx);font-size:12.5px;white-space:nowrap}
+.nb-t button:hover,.nb-a button:hover{border-color:var(--ac)}
+.nb-s,.nb-a{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.nb-s.wrap{flex-wrap:wrap;overflow:visible}
+.nb-c{display:inline-flex;align-items:center;gap:6px;max-width:260px;padding:5px 6px 5px 10px;border-radius:999px;background:var(--s2);border:1px solid var(--ln);font-size:12.5px;white-space:nowrap;flex-shrink:0}
+.nb-c button{color:var(--mu);width:20px;height:20px;border-radius:50%;font-size:11px}.nb-c button:hover{background:var(--ln);color:var(--tx)}
+.nb-a button{padding:6px 12px;border-radius:999px;background:rgba(124,131,255,.12);border:1px solid rgba(124,131,255,.3);font-size:13px;white-space:nowrap;flex-shrink:0}
+.nb-h{font-size:13px;color:var(--mu)}
+#dNb{width:min(92vw,480px)}
+.nbf{margin-bottom:14px}.nbf .btn{margin-bottom:8px}
+
+/* ---- Código y texto enriquecido en preguntas, opciones, tarjetas y explicaciones ---- */
+.cb{margin:.2em 0;text-align:left;max-width:100%}
+.cb pre{overflow-x:auto;tab-size:2}
+.cb code{display:block}
+.qh{font-size:clamp(18px,4.6vw,24px);line-height:1.4;font-weight:650;margin:6px 0 16px}
+.wy{color:var(--mu);margin-top:4px}
+.qh p,.opt p,.fc-x p,.why p,.wy p,.ts-p p{margin:0}
+.qh p+p,.wy p+p{margin-top:.6em}
+.qh :not(pre)>code,.opt :not(pre)>code,.fc-x :not(pre)>code,.why :not(pre)>code,.wy :not(pre)>code,.ts-p :not(pre)>code{background:var(--s2);border:1px solid var(--ln);padding:.1em .4em;border-radius:6px;font:.88em ui-monospace,Menlo,Consolas,monospace;color:#c9d1d9}
+.opt .cb,.fc-x .cb,.why .cb,.wy .cb,.qh .cb{font-size:13px}
+.opt .cbh .copy{display:none}
+.opt{white-space:normal}
+.fc-x{width:100%}
+.cv-fb{max-height:42dvh;overflow-y:auto}
+.ts-p{display:flex;gap:8px}.ts-p .qn{flex-shrink:0}.ts-p>div{min-width:0;flex:1}
+.tool .opts{counter-reset:o}
+.tool .opts .opt::before{counter-increment:o;content:counter(o,upper-alpha) ") ";font-weight:700;color:var(--ac);margin-right:4px}

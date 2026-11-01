@@ -18,13 +18,7 @@ const kv = {
 const cache = () => Promise.all([kv.set('chats', chats), kv.set('docs', docs)]);
 
 function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), 2600); }
-const md = t => { try { return DOMPurify.sanitize(marked.parse(t)); } catch { return '<p style="white-space:pre-wrap">' + esc(t) + '</p>'; } };
-if (window.marked) marked.use({renderer: {code(a, b) {
-  const code = typeof a === 'object' ? a.text : a, lang = ((typeof a === 'object' ? a.lang : b) || 'texto').split(/\s/)[0];
-  const tl = window.Tools && Tools.placeholder(code); if (tl) return tl;
-  let h; try { h = hljs.getLanguage(lang) ? hljs.highlight(code, {language: lang, ignoreIllegals: true}).value : esc(code); } catch { h = esc(code); }
-  return `<div class="cb"><div class="cbh"><span>${esc(lang)}</span><button class="copy">Copiar</button></div><pre><code>${h}</code></pre></div>`;
-}}});
+const md = t => Rich.md(t);
 
 // ---------- Guardado ----------
 function persist(c) { c.updatedAt = new Date().toISOString(); return cache(); }
@@ -54,9 +48,9 @@ function clearKey() { try { localStorage.removeItem('openrouter_api_key'); } cat
 function resetKey() { if (confirm('¿Borrar la API Key de este navegador?')) { clearKey(); needKey(); } }
 
 const hit = c => { const q = ($('#q')?.value || '').trim().toLowerCase(); return !q || c.title.toLowerCase().includes(q) || c.messages.some(m => m.content.toLowerCase().includes(q)); };
-const vis = () => Object.values(chats).sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+const vis = () => Object.values(chats).filter(c => (c.type === 'notebook') === (mode === 'notebook')).sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
 function list() {
-  $('#list').innerHTML = vis().filter(hit).map(c => `<div class="it${c.id === cur ? ' on' : ''}" data-id="${esc(c.id)}"><span class="t">${esc(c.title)}</span><button class="rn" title="Renombrar"><svg class="i" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button class="dl" title="Eliminar"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>`).join('') || `<p class="mut">${mode === 'course' ? 'Aún no hay cursos' : 'Aún no hay chats'}</p>`;
+  $('#list').innerHTML = vis().filter(hit).map(c => `<div class="it${c.id === cur ? ' on' : ''}" data-id="${esc(c.id)}"><span class="t">${esc(c.title)}</span><button class="rn" title="Renombrar"><svg class="i" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button class="dl" title="Eliminar"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>`).join('') || `<p class="mut">${mode === 'notebook' ? 'Aún no tienes cuadernos' : 'Aún no hay chats'}</p>`;
 }
 function docsUI() {
   $('#docs').innerHTML = Object.values(docs).map(d => `<div class="it" data-d="${esc(d.fileName)}"><span class="t"><svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8ZM14 3v5h5"/></svg> ${esc(d.title)}</span></div>`).join('') || '<p class="mut">Sin documentos</p>';
@@ -73,7 +67,7 @@ function render() {
   if (cur === undefined || (cur && !chats[cur])) { const l = vis()[0]; l ? open(l.id) : blank(); }
 }
 function blank() {
-  cur = null; $('#title').textContent = 'Nueva conversación'; $('#empty').hidden = false; $('#msgs').hidden = true;
+  cur = null; $('#title').textContent = 'Nueva conversación'; $('#empty').hidden = false; $('#msgs').hidden = true; window.NB && NB.sync();
   astUI(); list();
 }
 function open(id) {
@@ -82,7 +76,7 @@ function open(id) {
   const lu = c.messages.map(x => x.role).lastIndexOf('user'), la = c.messages.length - 1;
   c.messages.forEach((x, i) => addMsg(x.role, x.content, (x.role === 'user' ? i === lu : i === la) ? i : -1));
   astUI(); list();
-  if (innerWidth <= 860) document.body.classList.remove('open');
+  window.NB && NB.sync(); if (innerWidth <= 860) document.body.classList.remove('open');
   m.scrollTop = m.scrollHeight;
 }
 function bar(role, text, ei) {
@@ -110,7 +104,7 @@ function rename(id) {
 }
 async function del(id) {
   const c = chats[id]; if (!c || !confirm(`¿Eliminar "${c.title}"?`)) return;
-  delete chats[id]; cache();
+  delete chats[id]; cache(); window.NB && NB.drop(id);
   if (cur === id) cur = undefined; render();
 }
 async function saveDoc(text) {
@@ -141,7 +135,7 @@ async function send(text) {
   let c = chats[cur];
   if (!c) {
     const t = Date.now();
-    c = chats['chat_' + t] = {id: 'chat_' + t, fileName: `chat_${t}.json`, title: text.slice(0, 40), type: mode === 'course' ? 'course' : 'normal', assistantId: $('#ast').value, createdAt: new Date().toISOString(), messages: []};
+    c = chats['chat_' + t] = {id: 'chat_' + t, fileName: `chat_${t}.json`, title: text.slice(0, 40), type: mode === 'notebook' ? 'notebook' : 'normal', assistantId: $('#ast').value, createdAt: new Date().toISOString(), messages: []};
   }
   c.messages.push({role: 'user', content: text}); persist(c); open(c.id);
   const w = addMsg('assistant', ''), b = w.firstChild; b.classList.add('cur'); $('#msgs').scrollTop = 1e9;
@@ -149,7 +143,7 @@ async function send(text) {
   let acc = '', n = 0, timer = 0; const t0 = Date.now();
   const paint = () => { timer = 0; const s = near(); b.innerHTML = md(acc); $('#speed').textContent = Math.round(n / ((Date.now() - t0) / 1000)) + ' t/s'; if (s) $('#msgs').scrollTop = 1e9; };
   try {
-    const sys = [asts[c.assistantId]?.prompt, window.Tools?.prompt()].filter(Boolean).join('\n\n');
+    const sys = [asts[c.assistantId]?.prompt, window.NB && await NB.ctx(c, text), window.Tools?.prompt()].filter(Boolean).join('\n\n');
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST', signal: ctl.signal,
       headers: {'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': location.href, 'X-Title': 'Sara AI App'},
